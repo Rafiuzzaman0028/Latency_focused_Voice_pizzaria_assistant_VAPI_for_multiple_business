@@ -1,0 +1,11 @@
+# curl -X POST http://127.0.0.1:8000/voice
+
+
+# curl -X POST http://127.0.0.1:8000/voice-process \
+#   -d "SpeechResult=What service do you provide?" \
+#   -d "CallSid=CA12345"
+
+
+curl -X POST http://127.0.0.1:8000/voice-process \
+  -d "SpeechResult=Can I get a refund?" \
+  -d "CallSid=CA111"

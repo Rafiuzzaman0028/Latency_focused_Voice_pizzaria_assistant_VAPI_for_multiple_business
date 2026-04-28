@@ -1,0 +1,12 @@
+.env
+**/__pycache__/
+*.pyc
+<<<<<<< HEAD
+venv/
+call_logs/
+
+.env.example
+=======
+uploads/
+reports/
+>>>>>>> 108272368b09ce1dbae5fa86378a68c296436a4f

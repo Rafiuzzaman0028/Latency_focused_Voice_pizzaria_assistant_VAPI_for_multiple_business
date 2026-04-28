@@ -1,0 +1,102 @@
+{
+    "tenants": {
+        "e2e5cd68-cc0f-451d-8302-f606d21c8cb0": {
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "twilio_phone_number": "+447307277495",
+            "business_name": "courier service Speedy 2",
+            "manager_phone": "+8801322158015",
+            "report_text": "# Speedy Drop Couriers - Knowledge Base Report\n\n## Company Overview\nSpeedy Drop Couriers is a premium last-mile delivery and localized courier service operating exclusively within the metropolitan area. We pride ourselves on providing the fastest turnaround times for local businesses, offering services such as same-day delivery, secure document transport, and fragile item handling.\n\n## Services\n1. **Standard Delivery**: Packages picked up and delivered within 24 hours.  \n2. **Express Delivery**: Packages picked up and delivered within 4 hours.  \n3. **Secure Document Courier**: For sensitive legal or business documents, requiring recipient signature and ID check.\n\n## Pricing\n- **Standard Delivery**: $15 base fee.  \n- **Express Delivery**: $35 base fee.  \n- **Secure Document Courier**: $50 fixed fee.  \n- **Oversized Items**: An additional $10 fee for items over 10kg.\n\n## Policies\n- **Refunds**: A 50% refund is issued if a package is not delivered within the promised timeframe, unless the delay is due to weather or restricted building access.  \n- **Prohibited Items**: We do not deliver hazardous materials, live animals, or perishables.\n\n## FAQs\n- **Q**: Can I change the delivery address after shipping?  \n  **A**: No, the delivery address cannot be modified after dispatch for security reasons.\n\n- **Q**: How do you handle fragile items?  \n  **A**: Fragile items receive specialized padding free of charge, but must be labeled \"FRAGILE\" at pickup.\n\n- **Q**: What are your operational hours?  \n  **A**: We operate Monday to Friday, 8:00 AM to 8:00 PM. We do not deliver on weekends.\n\n## Tone of Speaking\nThe tone should be professional, extremely efficient, crisp, and helpful. The AI agent should communicate with authority and expertise in logistics, while valuing the customer's time.",
+            "script_text": "GREETING:  \nHello! Thank you for calling Speedy Drop Couriers. How can I assist you today?\n\nTONE:  \nProfessional and efficient."
+        }
+    },
+    "orders": [
+        {
+            "order_id": "4e7441f9-f69d-4900-a0d1-d7ae15618ef8",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "call_id": "CA7f1bd79c4e3e556682a0aa13ff49fa28",
+            "order_data": {
+                "items": [
+                    {
+                        "name": "Express Delivery",
+                        "quantity": 1
+                    }
+                ],
+                "confirmed": true
+            },
+            "status": "pending"
+        },
+        {
+            "order_id": "a9128eac-f8b8-4266-999f-307b5765d21e",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "call_id": "CA0e56f0de9ad5a738d9bcd2d25a3efdb7",
+            "order_data": {
+                "items": [
+                    {
+                        "name": "experiment",
+                        "quantity": 1
+                    }
+                ],
+                "confirmed": true
+            },
+            "status": "pending"
+        },
+        {
+            "order_id": "d30ff071-3d04-4fce-9266-e0cbf8816996",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "call_id": "CA2c46123c51beafbf1642918ee246ac9b",
+            "order_data": {
+                "items": [
+                    {
+                        "name": "Express Delivery",
+                        "quantity": 1
+                    }
+                ],
+                "confirmed": true
+            },
+            "status": "pending"
+        },
+        {
+            "order_id": "9a981248-62db-4d07-8893-178f73428f7a",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "call_id": "CA51f52540834a00816a4026dcd4ea0d7a",
+            "order_data": {
+                "items": [
+                    {
+                        "name": "express delivery",
+                        "quantity": 1
+                    },
+                    {
+                        "name": "standard delivery",
+                        "quantity": 1
+                    }
+                ],
+                "confirmed": true
+            },
+            "status": "pending"
+        }
+    ],
+    "call_logs": [
+        {
+            "call_id": "CA0e56f0de9ad5a738d9bcd2d25a3efdb7",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "transcript": "AI: Hello! Thank you for calling Speedy Drop Couriers. How may I assist you today? We offer several delivery options: 1. **Standard Delivery**: Available within 4 hours, with a base fee of $15. 2. **Express Delivery**: A quicker option for urgent packages, priced at $35 base fee. 3. **Secure Document Courier**: Specifically for sensitive documents requiring recipient signature and ID check, with a fixed fee of $50. If your package is oversized (over 10kg), there will be an additional $10 charge. How can I assist you further?\nAI: Hello! Thank you for calling Speedy Drop Couriers. How may I assist you today?\nAI: Hello! Thank you for calling Speedy Drop Couriers. You have a few options for delivery: 1. **Standard Delivery**: Available within 4 hours, with a base fee of $15. 2. **Express Delivery**: A quicker option for urgent packages, priced at $35 base fee. 3. **Secure Document Courier**: Specifically for sensitive documents requiring recipient signature and ID check, with a fixed fee of $50. Additionally, if your package is oversized (over 10kg), there will be an extra $10 charge. How can I assist you further?\nAI: Hello! Thank you for calling Speedy Drop Couriers. I will add the experiment to your order. Would you like to confirm this order?\nAI: Hello! Thank you for calling Speedy Drop Couriers. Your order for 1 experiment has been confirmed. How may I assist you further?\nAI: You don't have anything in your order yet. What would you like to order?"
+        },
+        {
+            "call_id": "CA2c46123c51beafbf1642918ee246ac9b",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "transcript": "AI: You have a couple of options for same-day delivery. You can choose our Express Delivery service, which ensures your package arrives today, or our Secure Document Courier service, which is available for sensitive documents requiring signature and ID check. Please let me know if you would like to proceed with any of these options. Is there anything else I can help you with?\nAI: Thank you for choosing our Express Delivery service. Your package will arrive today. Would you like to confirm this order?\nAI: The cost for our Express Delivery service is a base fee of $35. Would you like to proceed with your order?\nAI: Thank you for confirming your order. Your package will be delivered today via our Express Delivery service. If you need any further assistance, feel free to ask.\nAI: Hello! How can I assist you today?\nAI: You don't have anything in your order yet. What would you like to order?\nAI: Please hold while I transfer you."
+        },
+        {
+            "call_id": "CA51f52540834a00816a4026dcd4ea0d7a",
+            "tenant_id": "e2e5cd68-cc0f-451d-8302-f606d21c8cb0",
+            "caller_phone": "+8801322158015",
+            "transcript": "AI: I'm sorry, but your request is unclear. Could you please provide more details about what you would like to pick up?\nAI: I have noted your request for 1 express delivery and 1 standard delivery. Thank you for your order! Would you like to confirm this order?\nAI: Thank you for confirming your order for 1 express delivery and 1 standard delivery. We appreciate your business!"
+        }
+    ]
+}
