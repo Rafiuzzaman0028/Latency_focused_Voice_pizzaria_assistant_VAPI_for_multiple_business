@@ -2,10 +2,20 @@ import os
 import pandas as pd
 from pypdf import PdfReader
 from docx import Document
-import win32com.client
+try:
+    import win32com.client
+    WIN32_AVAILABLE = True
+except ImportError:
+    WIN32_AVAILABLE = False
 
 def convert_doc_to_docx(doc_path: str) -> str:
-    """Uses Microsoft Word to convert old .doc file into .docx."""
+    """Uses Microsoft Word to convert old .doc file into .docx (Windows only)."""
+    if not WIN32_AVAILABLE:
+        raise RuntimeError(
+            "Legacy .doc conversion requires 'pywin32' and Microsoft Word, which are only available on Windows. "
+            "Please upload your file as .docx, .pdf, or .txt for Linux VPS deployment."
+        )
+    
     word = win32com.client.Dispatch("Word.Application")
     word.Visible = False
 
