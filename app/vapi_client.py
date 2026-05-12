@@ -7,6 +7,8 @@ load_dotenv()
 
 VAPI_API_KEY = os.getenv("VAPI_API_KEY", "your-vapi-api-key")
 VAPI_BASE_URL = "https://api.vapi.ai"
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 HEADERS = {
     "Authorization": f"Bearer {VAPI_API_KEY}",
@@ -21,14 +23,14 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
     url = f"{VAPI_BASE_URL}/assistant"
     
     payload = {
-        "name": f"Assistant_for_{business_id}",
+        "name": business_id,
         "firstMessage": "Hello! How can I help you today?",
         "metadata": {
             "business_id": business_id
         },
         "model": {
             "provider": "openai",
-            "model": "gpt-4o",
+            "model": LLM_MODEL,
             "messages": [
                 {
                     "role": "system",
@@ -39,7 +41,8 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
         },
         "voice": {
             "provider": "11labs",
-            "voiceId": "bIHbv24MWmeRgasZH58o" # A standard 11labs voice ID
+            "voiceId": "JBFqnCBsd6RMkjVDRZzb", # George (British) voice ID
+            "model": "eleven_flash_v2_5" # Fast ElevenLabs model for minimum latency
         },
         "transcriber": {
             "provider": "deepgram",
