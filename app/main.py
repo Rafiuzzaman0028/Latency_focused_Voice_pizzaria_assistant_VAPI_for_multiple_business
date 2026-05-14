@@ -1,9 +1,15 @@
 import os
 import shutil
-from fastapi import FastAPI, UploadFile, Form, HTTPException, File
+import requests
+from fastapi import FastAPI, UploadFile, Form, HTTPException, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv()
+
+EXTERNAL_BACKEND_URL = os.getenv("EXTERNAL_BACKEND_URL", "")
 
 from app.extractor import extract_text, generate_uk_restaurant_prompt
 from app.vapi_client import create_assistant, link_telephony
@@ -55,7 +61,7 @@ async def create_agent(
         # Generate Perfect Prompt
         system_prompt = generate_uk_restaurant_prompt(rules_text, menu_text)
         
-        # Create Vapi Assistant
+        # Create Vapi Assistant (Auto-links the global tool ID from .env)
         vapi_response = create_assistant(business_id, system_prompt)
         
         # Clean up files
@@ -93,6 +99,86 @@ async def link_phone(request: TelephonyLinkRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- VAPI WEBHOOKS (MOVED FROM MOCK BACKEND) ---
+
+@app.post("/webhook/order")
+async def handle_order(request: Request):
+    """Receives the LIVE ORDER tool call from Vapi"""
+    data = await request.json()
+    
+    # DEBUG: Print raw data to see exactly what Vapi sends
+    # print(f"DEBUG ORDER DATA: {data}")
+
+    # For apiRequest tools, Vapi sends the arguments directly in the root or inside 'message'
+    if "customer_name" in data:
+        # This is a flat apiRequest tool call
+        args = data
+        business_id = "Dashboard Tool"
+    else:
+        # This is a Vapi Server tool call
+        message = data.get("message", {})
+        tool_call = message.get("toolCalls", [{}])[0]
+        args = tool_call.get("function", {}).get("arguments", {})
+        business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
+
+    print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
+    print(f"Customer: {args.get('customer_name')}")
+    print(f"Email: {args.get('customer_email')}")
+    print(f"Items: {args.get('order_items')}")
+    print(f"Total: £{args.get('total_price')}")
+    print("-------------------------------------------\n")
+
+    # --- FORWARD TO EXTERNAL BACKEND ---
+    if EXTERNAL_BACKEND_URL:
+        try:
+            forward_payload = {
+                "business_id": business_id,
+                "customer_name": args.get("customer_name"),
+                "customer_email": args.get("customer_email"),
+                "order_items": args.get("order_items"),
+                "total_price": args.get("total_price"),
+                "source": "vapi_voice_agent"
+            }
+            requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
+            print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
+        except Exception as e:
+            print(f"❌ Failed to forward order: {str(e)}")
+
+    # If it's a Dashboard Tool, we can return a simple success message
+    if "customer_name" in data:
+        return {"status": "success", "message": "Order saved"}
+        
+    # If it's a Server Tool, we need the toolCallId format
+    return {
+        "results": [{"toolCallId": data.get("message", {}).get("toolCalls", [{}])[0].get("id"), "result": "Order saved successfully"}]
+    }
+
+@app.post("/webhook/summary")
+async def handle_summary(request: Request):
+    """Receives the POST-CALL summary from Vapi"""
+    data = await request.json()
+    
+    message = data.get("message", {})
+    msg_type = data.get("type") or message.get("type")
+    
+    # Only process 'end-of-call-report' or 'status-update' that actually has a summary
+    call_data = message.get("call", data.get("call", {}))
+    analysis = call_data.get("analysis", {})
+    summary = analysis.get("summary")
+
+    if not summary:
+        return {"status": "ignored", "reason": "no summary in this packet"}
+
+    business_id = call_data.get("metadata", {}).get("business_id", "Unknown")
+
+    print(f"\n--- 📝 FINAL CALL SUMMARY for {business_id} ---")
+    print(f"AI Summary: {summary}")
+    print(f"Transcript Snippet: {call_data.get('transcript', '')[:100]}...")
+    print("------------------------------------------\n")
+
+    return {"status": "received"}
 
 
 if __name__ == "__main__":
