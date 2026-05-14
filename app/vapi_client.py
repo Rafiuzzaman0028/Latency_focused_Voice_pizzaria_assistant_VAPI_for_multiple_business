@@ -59,11 +59,13 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
             "language": "en-GB"
         },
         "analysisPlan": {
-            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, their mood, what they ordered, and if the order was successfully handled.",
+            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, and if the order was successfully handled.",
             "structuredDataPrompt": "Extract the final order details for database logging.",
             "structuredDataSchema": {
                 "type": "object",
                 "properties": {
+                    "customer_name": {"type": "string"},
+                    "customer_email": {"type": "string"},
                     "final_items": {"type": "array", "items": {"type": "string"}},
                     "total_paid": {"type": "number"},
                     "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
