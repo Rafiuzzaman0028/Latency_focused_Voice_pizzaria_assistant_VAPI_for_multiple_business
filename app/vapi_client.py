@@ -9,6 +9,8 @@ VAPI_API_KEY = os.getenv("VAPI_API_KEY", "your-vapi-api-key")
 VAPI_BASE_URL = "https://api.vapi.ai"
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+VAPI_DEFAULT_TOOL_ID = os.getenv("VAPI_DEFAULT_TOOL_ID", "")
+VAPI_SERVER_URL = os.getenv("VAPI_SERVER_URL", "")
 
 HEADERS = {
     "Authorization": f"Bearer {VAPI_API_KEY}",
@@ -17,14 +19,20 @@ HEADERS = {
 
 def create_assistant(business_id: str, system_prompt: str) -> dict:
     """
-    Creates an assistant on Vapi and injects the business_id as metadata.
-    Also defines an analysisPlan to automatically extract the order summary.
+    Creates an assistant on Vapi and automatically attaches the pre-configured
+    Order Tool ID from the environment.
     """
     url = f"{VAPI_BASE_URL}/assistant"
     
+    # Strictly use the tool ID configured in the .env for all agents
+    tool_ids = []
+    if VAPI_DEFAULT_TOOL_ID:
+        tool_ids.append(VAPI_DEFAULT_TOOL_ID)
+
     payload = {
-        "name": business_id,
-        "firstMessage": "Hello! How can I help you today?",
+        "name": business_id, # Exactly the name you provide
+        "firstMessage": "Hello! Thanks for calling. How can I help you with your order today?",
+        "serverUrl": VAPI_SERVER_URL, # Auto-links the summary webhook from .env
         "metadata": {
             "business_id": business_id
         },
@@ -37,45 +45,38 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                     "content": system_prompt
                 }
             ],
-            "temperature": 0.4
+            "temperature": 0.4,
+            "toolIds": tool_ids # Links your dashboard-created tool
         },
         "voice": {
             "provider": "11labs",
-            "voiceId": "JBFqnCBsd6RMkjVDRZzb", # George (British) voice ID
-            "model": "eleven_flash_v2_5" # Fast ElevenLabs model for minimum latency
+            "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+            "model": "eleven_flash_v2_5"
         },
         "transcriber": {
             "provider": "deepgram",
             "model": "nova-2",
             "language": "en-GB"
         },
-        # Instruct Vapi to extract the order structure and generate a summary post-call
         "analysisPlan": {
-            "summaryPrompt": "Summarize the call focusing on the customer's intent and any issues.",
-            "structuredDataPrompt": "Extract the items the customer ordered and their quantities.",
+            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, their mood, what they ordered, and if the order was successfully handled.",
+            "structuredDataPrompt": "Extract the final order details for database logging.",
             "structuredDataSchema": {
                 "type": "object",
                 "properties": {
-                    "order_items": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "item_name": {"type": "string"},
-                                "quantity": {"type": "integer"},
-                                "notes": {"type": "string"}
-                            }
-                        }
-                    },
-                    "delivery_or_collection": {"type": "string", "enum": ["delivery", "collection"]},
-                    "customer_postcode": {"type": "string"}
+                    "final_items": {"type": "array", "items": {"type": "string"}},
+                    "total_paid": {"type": "number"},
+                    "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
                 }
             }
         }
     }
     
     response = requests.post(url, headers=HEADERS, json=payload)
-    response.raise_for_status()
+    if response.status_code >= 400:
+        # Return the actual error from Vapi so it shows in the browser
+        error_msg = response.text
+        raise Exception(f"Vapi Error: {error_msg}")
     
     return response.json()
 
