@@ -46,7 +46,7 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                 }
             ],
             "temperature": 0.4,
-            "toolIds": tool_ids # Links your dashboard-created tool
+            "toolIds": tool_ids # Links your dashboard-created tool inside model
         },
         "voice": {
             "provider": "11labs",
@@ -59,15 +59,15 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
             "language": "en-GB"
         },
         "analysisPlan": {
-            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, and if the order was successfully handled.",
-            "structuredDataPrompt": "Extract the final order details for database logging.",
+            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, the total price of the order, and if the order was successfully handled.",
+            "structuredDataPrompt": "Extract the final order details for database logging. Ensure the 'total_price' is calculated correctly from the menu prices.",
             "structuredDataSchema": {
                 "type": "object",
                 "properties": {
                     "customer_name": {"type": "string"},
                     "customer_email": {"type": "string"},
                     "final_items": {"type": "array", "items": {"type": "string"}},
-                    "total_paid": {"type": "number"},
+                    "total_price": {"type": "number"},
                     "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
                 }
             }
