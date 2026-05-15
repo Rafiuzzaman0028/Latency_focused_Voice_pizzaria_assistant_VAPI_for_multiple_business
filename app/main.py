@@ -106,10 +106,14 @@ async def link_phone(request: TelephonyLinkRequest):
 @app.post("/webhook/order")
 async def handle_order(request: Request):
     """Receives the LIVE ORDER tool call from Vapi"""
+    body = await request.body()
+    if not body:
+        return {"status": "error", "message": "Empty request body"}
+    
     data = await request.json()
     
     # DEBUG: Print raw data to see exactly what Vapi sends
-    # print(f"DEBUG ORDER DATA: {data}")
+    print(f"DEBUG ORDER DATA: {data}")
 
     # For apiRequest tools, Vapi sends the arguments directly in the root or inside 'message'
     if "customer_name" in data:
@@ -179,6 +183,12 @@ async def handle_summary(request: Request):
     print("------------------------------------------\n")
 
     return {"status": "received"}
+
+
+@app.post("/api/webhook/vapi")
+async def vapi_tool_fallback(request: Request):
+    """Fallback for when the dashboard tool URL is set to /api/webhook/vapi"""
+    return await handle_order(request)
 
 
 if __name__ == "__main__":
