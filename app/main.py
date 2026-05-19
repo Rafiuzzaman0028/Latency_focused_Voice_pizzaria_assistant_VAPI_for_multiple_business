@@ -223,9 +223,24 @@ async def handle_summary(request: Request):
 
 
 @app.post("/api/webhook/vapi")
-async def vapi_tool_fallback(request: Request):
-    """Fallback for when the dashboard tool URL is set to /api/webhook/vapi"""
-    return await handle_order(request)
+async def vapi_tool_fallback(request: Request, background_tasks: BackgroundTasks):
+    """Central Webhook Router for Vapi (Receives Tools, Summaries, and Status Updates)"""
+    try:
+        data = await request.json()
+    except Exception:
+        return {"status": "error", "message": "Invalid JSON"}
+
+    message = data.get("message", {})
+    msg_type = message.get("type", data.get("type", ""))
+
+    if msg_type == "tool-calls" or "toolCalls" in message or "toolWithToolCallList" in message or "customer_name" in data:
+        # Route to Order Logic
+        return await handle_order(request, background_tasks)
+    elif msg_type in ["end-of-call-report", "status-update", "hang-up"]:
+        # Route to Summary Logic
+        return await handle_summary(request)
+    else:
+        return {"status": "ignored", "reason": f"Unhandled message type: {msg_type}"}
 
 
 if __name__ == "__main__":
