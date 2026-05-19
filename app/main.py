@@ -103,11 +103,12 @@ async def link_phone(request: TelephonyLinkRequest):
 
 # --- VAPI WEBHOOKS (MOVED FROM MOCK BACKEND) ---
 
-def forward_order_task(business_id: str, args: dict):
+def forward_order_task(business_id: str, assistant_id: str, args: dict):
     """Runs in the background to prevent Vapi tool timeouts"""
     if EXTERNAL_BACKEND_URL:
         try:
             forward_payload = {
+                "assistantId": assistant_id,
                 "business_id": business_id,
                 "customer_name": args.get("customer_name"),
                 "customer_email": args.get("customer_email"),
@@ -138,6 +139,7 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         # This is a flat apiRequest tool call
         args = data
         business_id = "Dashboard Tool"
+        assistant_id = "Unknown" # Flat API requests usually don't send this outside headers
         print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
         print(f"Customer: {args.get('customer_name')}")
         print(f"Email: {args.get('customer_email')}")
@@ -146,7 +148,7 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         print("-------------------------------------------\n")
 
         # Forward in background to avoid blocking Vapi
-        background_tasks.add_task(forward_order_task, business_id, args)
+        background_tasks.add_task(forward_order_task, business_id, assistant_id, args)
 
         # Return explicit instructions to the LLM
         return {
@@ -157,6 +159,10 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
     else:
         # This is a Vapi Server tool call
         message = data.get("message", {})
+        
+        # Extract assistant ID from the server tool payload
+        call_data = message.get("call", {})
+        assistant_id = call_data.get("assistantId", "Unknown")
         
         # Vapi might send 'toolCalls' or 'toolWithToolCallList' depending on the API version
         tool_calls = message.get("toolCalls", [])
@@ -179,6 +185,7 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
             business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
 
             print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
+            print(f"Assistant ID: {assistant_id}")
             print(f"Customer: {args.get('customer_name')}")
             print(f"Email: {args.get('customer_email')}")
             print(f"Items: {args.get('order_items')}")
@@ -186,7 +193,7 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
             print("-------------------------------------------\n")
 
             # Forward in background to avoid blocking Vapi
-            background_tasks.add_task(forward_order_task, business_id, args)
+            background_tasks.add_task(forward_order_task, business_id, assistant_id, args)
 
             # Return explicit instructions to the LLM
             results.append({
