@@ -32,7 +32,10 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
     payload = {
         "name": business_id, # Exactly the name you provide
         "firstMessage": "Hello! Thanks for calling. How can I help you with your order today?",
-        "serverUrl": VAPI_SERVER_URL, # Auto-links the summary webhook from .env
+        "server": {
+            "url": VAPI_SERVER_URL, # Auto-links the summary webhook from .env
+            "timeoutSeconds": 20
+        },
         "metadata": {
             "business_id": business_id
         },
@@ -59,17 +62,44 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
             "language": "en-GB"
         },
         "analysisPlan": {
-            "summaryPrompt": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, the total price of the order, and if the order was successfully handled.",
-            "structuredDataPrompt": "Extract the final order details for database logging. Ensure the 'total_price' is calculated correctly from the menu prices.",
-            "structuredDataSchema": {
-                "type": "object",
-                "properties": {
-                    "customer_name": {"type": "string"},
-                    "customer_email": {"type": "string"},
-                    "final_items": {"type": "array", "items": {"type": "string"}},
-                    "total_price": {"type": "number"},
-                    "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
-                }
+            "summaryPlan": {
+                "enabled": True,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, the total price of the order, and if the order was successfully handled."
+                    },
+                    {
+                        "role": "user",
+                        "content": "Here is the transcript:\n\n{{transcript}}\n\n. Here is the ended reason of the call:\n\n{{endedReason}}\n\n"
+                    }
+                ]
+            },
+            "structuredDataPlan": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "customer_name": {"type": "string"},
+                        "customer_email": {"type": "string"},
+                        "final_items": {"type": "array", "items": {"type": "string"}},
+                        "total_price": {"type": "number"},
+                        "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
+                    }
+                },
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Extract the final order details for database logging. Ensure the 'total_price' is calculated correctly from the menu prices.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
+                    },
+                    {
+                        "role": "user",
+                        "content": "Here is the transcript:\n\n{{transcript}}\n\n. Here is the ended reason of the call:\n\n{{endedReason}}\n\n"
+                    }
+                ]
+            },
+            "successEvaluationPlan": {
+                "enabled": True,
+                "rubric": "PassFail"
             }
         }
     }
