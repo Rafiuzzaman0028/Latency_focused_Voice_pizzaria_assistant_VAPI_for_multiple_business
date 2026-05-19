@@ -120,44 +120,70 @@ async def handle_order(request: Request):
         # This is a flat apiRequest tool call
         args = data
         business_id = "Dashboard Tool"
+        print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
+        print(f"Customer: {args.get('customer_name')}")
+        print(f"Email: {args.get('customer_email')}")
+        print(f"Items: {args.get('order_items')}")
+        print(f"Total: £{args.get('total_price')}")
+        print("-------------------------------------------\n")
+
+        # --- FORWARD TO EXTERNAL BACKEND ---
+        if EXTERNAL_BACKEND_URL:
+            try:
+                forward_payload = {
+                    "business_id": business_id,
+                    "customer_name": args.get("customer_name"),
+                    "customer_email": args.get("customer_email"),
+                    "order_items": args.get("order_items"),
+                    "total_price": args.get("total_price"),
+                    "source": "vapi_voice_agent"
+                }
+                requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
+                print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
+            except Exception as e:
+                print(f"❌ Failed to forward order: {str(e)}")
+
+        return {"status": "success", "message": "Order saved"}
+
     else:
         # This is a Vapi Server tool call
         message = data.get("message", {})
-        tool_call = message.get("toolCalls", [{}])[0]
-        args = tool_call.get("function", {}).get("arguments", {})
-        business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
-
-    print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
-    print(f"Customer: {args.get('customer_name')}")
-    print(f"Email: {args.get('customer_email')}")
-    print(f"Items: {args.get('order_items')}")
-    print(f"Total: £{args.get('total_price')}")
-    print("-------------------------------------------\n")
-
-    # --- FORWARD TO EXTERNAL BACKEND ---
-    if EXTERNAL_BACKEND_URL:
-        try:
-            forward_payload = {
-                "business_id": business_id,
-                "customer_name": args.get("customer_name"),
-                "customer_email": args.get("customer_email"),
-                "order_items": args.get("order_items"),
-                "total_price": args.get("total_price"),
-                "source": "vapi_voice_agent"
-            }
-            requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
-            print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
-        except Exception as e:
-            print(f"❌ Failed to forward order: {str(e)}")
-
-    # If it's a Dashboard Tool, we can return a simple success message
-    if "customer_name" in data:
-        return {"status": "success", "message": "Order saved"}
+        tool_calls = message.get("toolCalls", [])
         
-    # If it's a Server Tool, we need the toolCallId format
-    return {
-        "results": [{"toolCallId": data.get("message", {}).get("toolCalls", [{}])[0].get("id"), "result": "Order saved successfully"}]
-    }
+        results = []
+        for tool_call in tool_calls:
+            args = tool_call.get("function", {}).get("arguments", {})
+            business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
+
+            print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
+            print(f"Customer: {args.get('customer_name')}")
+            print(f"Email: {args.get('customer_email')}")
+            print(f"Items: {args.get('order_items')}")
+            print(f"Total: £{args.get('total_price')}")
+            print("-------------------------------------------\n")
+
+            # --- FORWARD TO EXTERNAL BACKEND ---
+            if EXTERNAL_BACKEND_URL:
+                try:
+                    forward_payload = {
+                        "business_id": business_id,
+                        "customer_name": args.get("customer_name"),
+                        "customer_email": args.get("customer_email"),
+                        "order_items": args.get("order_items"),
+                        "total_price": args.get("total_price"),
+                        "source": "vapi_voice_agent"
+                    }
+                    requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
+                    print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
+                except Exception as e:
+                    print(f"❌ Failed to forward order: {str(e)}")
+
+            results.append({
+                "toolCallId": tool_call.get("id"),
+                "result": "Order saved successfully"
+            })
+            
+        return {"results": results}
 
 @app.post("/webhook/summary")
 async def handle_summary(request: Request):
