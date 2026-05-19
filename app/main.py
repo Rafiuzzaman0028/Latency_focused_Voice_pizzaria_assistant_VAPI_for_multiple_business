@@ -148,16 +148,34 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
         # Forward in background to avoid blocking Vapi
         background_tasks.add_task(forward_order_task, business_id, args)
 
-        return {"status": "success", "message": "Order saved"}
+        # Return explicit instructions to the LLM
+        return {
+            "status": "success", 
+            "result": "Order saved successfully. The kitchen has received the order. Immediately inform the customer their order is confirmed and politely say goodbye to end the call."
+        }
 
     else:
         # This is a Vapi Server tool call
         message = data.get("message", {})
+        
+        # Vapi might send 'toolCalls' or 'toolWithToolCallList' depending on the API version
         tool_calls = message.get("toolCalls", [])
+        if not tool_calls and "toolWithToolCallList" in message:
+            for item in message.get("toolWithToolCallList", []):
+                if "toolCall" in item:
+                    tool_calls.append(item["toolCall"])
         
         results = []
         for tool_call in tool_calls:
             args = tool_call.get("function", {}).get("arguments", {})
+            
+            # OpenAI/Vapi often send arguments as a JSON string
+            if isinstance(args, str):
+                import json
+                try:
+                    args = json.loads(args)
+                except Exception:
+                    args = {}
             business_id = message.get("customer", {}).get("metadata", {}).get("business_id", "Unknown")
 
             print(f"\n--- 🍕 NEW ORDER RECEIVED for {business_id} ---")
@@ -170,9 +188,10 @@ async def handle_order(request: Request, background_tasks: BackgroundTasks):
             # Forward in background to avoid blocking Vapi
             background_tasks.add_task(forward_order_task, business_id, args)
 
+            # Return explicit instructions to the LLM
             results.append({
                 "toolCallId": tool_call.get("id"),
-                "result": "Order saved successfully"
+                "result": "Order saved successfully. The kitchen has received the order. Immediately inform the customer their order is confirmed and politely say goodbye to end the call."
             })
             
         return {"results": results}
