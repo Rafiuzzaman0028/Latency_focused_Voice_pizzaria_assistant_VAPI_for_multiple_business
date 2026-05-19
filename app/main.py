@@ -1,7 +1,7 @@
 import os
 import shutil
 import requests
-from fastapi import FastAPI, UploadFile, Form, HTTPException, File, Request
+from fastapi import FastAPI, UploadFile, Form, HTTPException, File, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -103,8 +103,26 @@ async def link_phone(request: TelephonyLinkRequest):
 
 # --- VAPI WEBHOOKS (MOVED FROM MOCK BACKEND) ---
 
+def forward_order_task(business_id: str, args: dict):
+    """Runs in the background to prevent Vapi tool timeouts"""
+    if EXTERNAL_BACKEND_URL:
+        try:
+            forward_payload = {
+                "business_id": business_id,
+                "customer_name": args.get("customer_name"),
+                "customer_email": args.get("customer_email"),
+                "order_items": args.get("order_items"),
+                "total_price": args.get("total_price"),
+                "source": "vapi_voice_agent"
+            }
+            requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
+            print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
+        except Exception as e:
+            print(f"❌ Failed to forward order: {str(e)}")
+
+
 @app.post("/webhook/order")
-async def handle_order(request: Request):
+async def handle_order(request: Request, background_tasks: BackgroundTasks):
     """Receives the LIVE ORDER tool call from Vapi"""
     body = await request.body()
     if not body:
@@ -113,7 +131,7 @@ async def handle_order(request: Request):
     data = await request.json()
     
     # DEBUG: Print raw data to see exactly what Vapi sends
-    print(f"DEBUG ORDER DATA: {data}")
+    # print(f"DEBUG ORDER DATA: {data}")
 
     # For apiRequest tools, Vapi sends the arguments directly in the root or inside 'message'
     if "customer_name" in data:
@@ -127,21 +145,8 @@ async def handle_order(request: Request):
         print(f"Total: £{args.get('total_price')}")
         print("-------------------------------------------\n")
 
-        # --- FORWARD TO EXTERNAL BACKEND ---
-        if EXTERNAL_BACKEND_URL:
-            try:
-                forward_payload = {
-                    "business_id": business_id,
-                    "customer_name": args.get("customer_name"),
-                    "customer_email": args.get("customer_email"),
-                    "order_items": args.get("order_items"),
-                    "total_price": args.get("total_price"),
-                    "source": "vapi_voice_agent"
-                }
-                requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
-                print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
-            except Exception as e:
-                print(f"❌ Failed to forward order: {str(e)}")
+        # Forward in background to avoid blocking Vapi
+        background_tasks.add_task(forward_order_task, business_id, args)
 
         return {"status": "success", "message": "Order saved"}
 
@@ -162,21 +167,8 @@ async def handle_order(request: Request):
             print(f"Total: £{args.get('total_price')}")
             print("-------------------------------------------\n")
 
-            # --- FORWARD TO EXTERNAL BACKEND ---
-            if EXTERNAL_BACKEND_URL:
-                try:
-                    forward_payload = {
-                        "business_id": business_id,
-                        "customer_name": args.get("customer_name"),
-                        "customer_email": args.get("customer_email"),
-                        "order_items": args.get("order_items"),
-                        "total_price": args.get("total_price"),
-                        "source": "vapi_voice_agent"
-                    }
-                    requests.post(EXTERNAL_BACKEND_URL, json=forward_payload, timeout=5)
-                    print(f"✅ Order forwarded to {EXTERNAL_BACKEND_URL}")
-                except Exception as e:
-                    print(f"❌ Failed to forward order: {str(e)}")
+            # Forward in background to avoid blocking Vapi
+            background_tasks.add_task(forward_order_task, business_id, args)
 
             results.append({
                 "toolCallId": tool_call.get("id"),
