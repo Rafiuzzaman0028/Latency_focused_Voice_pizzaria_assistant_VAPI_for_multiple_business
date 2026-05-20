@@ -45,7 +45,7 @@
   - `"product_name"` (string representing the item's menu name)
   - `"quantity"` (string representing the quantity ordered, e.g. "2")
   - `"unit_prize"` (string representing the individual menu price of the item, e.g. "3.5")
-  Example format to pass: '{"order_details": [{"product_name": "Cola", "quantity": "2", "unit_prize": "3.5"}, {"product_name": "pizza", "quantity": "2", "unit_prize": "21.5"}]}'
+  Example format to pass: '{{"order_details": [{{"product_name": "Cola", "quantity": "2", "unit_prize": "3.5"}}, {{"product_name": "pizza", "quantity": "2", "unit_prize": "21.5"}}]}}'
 
 
 ## 🎙️ AUDIO HANDLING (STT RECOVERY)
