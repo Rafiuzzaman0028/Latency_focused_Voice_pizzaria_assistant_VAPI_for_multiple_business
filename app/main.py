@@ -257,6 +257,7 @@ def forward_order_task(business_id: str, assistant_id: str, args: dict):
                 "customer_email": args.get("customer_email"),
                 "order_items": args.get("order_items"),  # KEEP original key for backward compatibility
                 "order_details": order_details,          # ADD new requested JSON format
+                "items": order_details,                  # ADD items key matching user requested schema
                 "total_price": args.get("total_price"),
                 "source": "vapi_voice_agent"
             }
@@ -370,9 +371,13 @@ async def handle_summary(request: Request):
         return {"status": "ignored", "reason": "no summary in this packet"}
 
     business_id = call_data.get("metadata", {}).get("business_id", "Unknown")
+    structured_data = analysis.get("structuredData")
 
     print(f"\n--- 📝 FINAL CALL SUMMARY for {business_id} ---")
     print(f"AI Summary: {summary}")
+    if structured_data:
+        import json
+        print(f"Structured Data: {json.dumps(structured_data, indent=2)}")
     print(f"Transcript Snippet: {call_data.get('transcript', '')[:100]}...")
     print("------------------------------------------\n")
 
