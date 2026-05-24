@@ -81,10 +81,22 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                     "properties": {
                         "customer_name": {"type": "string"},
                         "customer_email": {"type": "string"},
-                        "final_items": {"type": "array", "items": {"type": "string"}},
+                        "items": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "product_name": {"type": "string"},
+                                    "quantity": {"type": "string"},
+                                    "unit_prize": {"type": "string"}
+                                },
+                                "required": ["product_name", "quantity", "unit_prize"]
+                            }
+                        },
                         "total_price": {"type": "number"},
                         "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]}
-                    }
+                    },
+                    "required": ["customer_name", "customer_email", "items", "total_price", "order_status"]
                 },
                 "messages": [
                     {
