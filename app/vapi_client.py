@@ -19,11 +19,23 @@ HEADERS = {
 
 def create_assistant(business_id: str, system_prompt: str) -> dict:
     """
-    Creates an assistant on Vapi and automatically attaches the pre-configured
-    Order Tool ID from the environment.
+    Creates or updates an assistant on Vapi. If an assistant with the name
+    already exists, it updates it in-place using PATCH so changes are published instantly.
     """
-    url = f"{VAPI_BASE_URL}/assistant"
-    
+    existing_id = None
+    try:
+        # Search for existing assistant with this name/business_id to prevent duplicates and auto-publish
+        list_url = f"{VAPI_BASE_URL}/assistant"
+        list_res = requests.get(list_url, headers=HEADERS)
+        if list_res.status_code == 200:
+            assistants = list_res.json()
+            for ast in assistants:
+                if ast.get("name") == business_id or ast.get("metadata", {}).get("business_id") == business_id:
+                    existing_id = ast.get("id")
+                    break
+    except Exception as e:
+        print(f"Warning: Failed to search for existing assistant: {e}")
+
     # Strictly use the tool ID configured in the .env for all agents
     tool_ids = []
     if VAPI_DEFAULT_TOOL_ID:
@@ -116,7 +128,15 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
         }
     }
     
-    response = requests.post(url, headers=HEADERS, json=payload)
+    if existing_id:
+        print(f"[SYNC] Assistant '{business_id}' already exists (ID: {existing_id}). Updating in-place...")
+        url = f"{VAPI_BASE_URL}/assistant/{existing_id}"
+        response = requests.patch(url, headers=HEADERS, json=payload)
+    else:
+        print(f"[NEW] Creating new assistant '{business_id}'...")
+        url = f"{VAPI_BASE_URL}/assistant"
+        response = requests.post(url, headers=HEADERS, json=payload)
+
     if response.status_code >= 400:
         # Return the actual error from Vapi so it shows in the browser
         error_msg = response.text
