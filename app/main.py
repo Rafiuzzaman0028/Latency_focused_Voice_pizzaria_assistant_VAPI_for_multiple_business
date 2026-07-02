@@ -16,6 +16,7 @@ from app.extractor import extract_text, generate_uk_restaurant_prompt
 from app.vapi_client import create_assistant, link_telephony
 
 from app.business_store import save_business_config, get_business_config
+from app.voice_registry import VOICE_CATALOGUE, is_valid_voice_id, DEFAULT_VOICE_ID
 
 def parse_single_string_item(item_str: str) -> dict:
     import re
@@ -169,6 +170,24 @@ app.add_middleware(
 
 os.makedirs("uploads", exist_ok=True)
 
+
+@app.get("/api/voices")
+async def list_voices():
+    """Returns available UK voice options for the frontend dropdown."""
+    return {
+        "voices": [
+            {
+                "id": v["id"],
+                "name": v["name"],
+                "gender": v["gender"],
+                "accent": v["accent"],
+                "description": v["description"],
+            }
+            for v in VOICE_CATALOGUE
+        ]
+    }
+
+
 class TelephonyLinkRequest(BaseModel):
     assistant_id: str
     twilio_number: str
@@ -185,7 +204,8 @@ async def create_agent(
     menu_file: UploadFile = File(...),
     special_offers_text: str = Form(""),
     special_offers_file: Optional[UploadFile] = File(None),
-    special_offers_enabled: bool = Form(True)
+    special_offers_enabled: bool = Form(True),
+    voice_id: str = Form("")
 ):
     """
     Creates or updates a Vapi assistant.
@@ -240,7 +260,12 @@ async def create_agent(
             special_offers_text=active_special_offers_text
         )
 
-        vapi_response = create_assistant(business_id, system_prompt)
+        # Resolve voice ID — use default if empty or not in catalogue
+        selected_voice_id = voice_id.strip() if voice_id else ""
+        if not selected_voice_id or not is_valid_voice_id(selected_voice_id):
+            selected_voice_id = DEFAULT_VOICE_ID
+
+        vapi_response = create_assistant(business_id, system_prompt, voice_id=selected_voice_id)
 
         save_business_config(
             business_id,
@@ -250,7 +275,8 @@ async def create_agent(
                 "menu_text": menu_text,
                 "special_offers_enabled": special_offers_enabled,
                 "special_offers_text": saved_special_offers_text,
-                "assistant_id": vapi_response.get("id")
+                "assistant_id": vapi_response.get("id"),
+                "voice_id": selected_voice_id
             }
         )
 
@@ -320,7 +346,8 @@ async def update_special_offers(
 
         # Your create_assistant() already PATCHES the existing Vapi assistant
         # if it finds the same business_id.
-        vapi_response = create_assistant(business_id, system_prompt)
+        stored_voice_id = config.get("voice_id", DEFAULT_VOICE_ID)
+        vapi_response = create_assistant(business_id, system_prompt, voice_id=stored_voice_id)
 
         config["special_offers_enabled"] = request.enabled
         config["special_offers_text"] = saved_special_offers_text
