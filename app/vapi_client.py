@@ -17,7 +17,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def create_assistant(business_id: str, system_prompt: str) -> dict:
+def create_assistant(business_id: str, system_prompt: str, voice_id: str = "") -> dict:
     """
     Creates or updates an assistant on Vapi. If an assistant with the name
     already exists, it updates it in-place using PATCH so changes are published instantly.
@@ -65,7 +65,7 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
         },
         "voice": {
             "provider": "11labs",
-            "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+            "voiceId": voice_id if voice_id else "JBFqnCBsd6RMkjVDRZzb",
             "model": "eleven_flash_v2_5"
         },
         "transcriber": {
