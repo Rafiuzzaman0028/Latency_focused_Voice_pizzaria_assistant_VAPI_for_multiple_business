@@ -6,4 +6,4 @@ call_logs/
 .env.example
 uploads/
 reports/
-
+business_configs.json
