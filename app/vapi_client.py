@@ -17,7 +17,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def create_assistant(business_id: str, system_prompt: str, voice_id: str = "") -> dict:
+def create_assistant(business_id: str, system_prompt: str) -> dict:
     """
     Creates or updates an assistant on Vapi. If an assistant with the name
     already exists, it updates it in-place using PATCH so changes are published instantly.
@@ -65,7 +65,7 @@ def create_assistant(business_id: str, system_prompt: str, voice_id: str = "") -
         },
         "voice": {
             "provider": "11labs",
-            "voiceId": voice_id if voice_id else "JBFqnCBsd6RMkjVDRZzb",
+            "voiceId": "FF59babHL8N8gfTgtBMT",
             "model": "eleven_flash_v2_5"
         },
         "transcriber": {
@@ -158,10 +158,82 @@ def link_telephony(assistant_id: str, twilio_number: str, manager_number: str) -
         "assistantId": assistant_id,
         "twilioAccountSid": os.getenv("TWILIO_ACCOUNT_SID", ""),
         "twilioAuthToken": os.getenv("TWILIO_AUTH_TOKEN", ""),
-        "name": f"Line for {assistant_id}"
+        "name": f"Line for {assistant_id[:25]}"
     }
     
     response = requests.post(url, headers=HEADERS, json=payload)
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise Exception(f"Vapi Error {response.status_code}: {response.text}")
     
+    if manager_number:
+        # Fetch all global tools to avoid duplicates
+        tool_url = f"{VAPI_BASE_URL}/tool"
+        all_tools_res = requests.get(tool_url, headers=HEADERS)
+        all_tools = all_tools_res.json() if all_tools_res.status_code == 200 else []
+        
+        # Find if a transfer tool for this manager number already exists
+        existing_transfer_tools = [t for t in all_tools if t.get("type") == "transferCall"]
+        tool_id = None
+        
+        for t in existing_transfer_tools:
+            dests = t.get("destinations", [])
+            if dests and dests[0].get("number") == manager_number:
+                tool_id = t["id"]
+                break
+                
+        # If not found, create it
+        if not tool_id:
+            tool_payload = {
+                "type": "transferCall",
+                "destinations": [
+                    {
+                        "type": "number",
+                        "number": manager_number,
+                        "message": "Please hold while I transfer you to the manager."
+                    }
+                ],
+                "function": {
+                    "name": "transferToManager",
+                    "description": "Transfers the call to a human manager. Invoke this tool immediately when the user asks to speak to a human or manager."
+                }
+            }
+            tool_res = requests.post(tool_url, headers=HEADERS, json=tool_payload)
+            if tool_res.status_code >= 400:
+                raise Exception(f"Vapi Tool Creation Error {tool_res.status_code}: {tool_res.text}")
+            tool_id = tool_res.json().get("id")
+        
+        # Patch the assistant — clean all transferCall references, then add single correct one
+        patch_assistant_url = f"{VAPI_BASE_URL}/assistant/{assistant_id}"
+        get_res = requests.get(patch_assistant_url, headers=HEADERS)
+        if get_res.status_code == 200:
+            assistant_data = get_res.json()
+            model_data = assistant_data.get("model", {})
+            
+            # Clean model.tools array (remove any inline transferCall tools)
+            if "tools" in model_data:
+                model_data["tools"] = [t for t in model_data["tools"] if t.get("type") != "transferCall"]
+                
+            # Clean model.toolIds — remove ALL transferCall tool IDs
+            existing_tool_ids = model_data.get("toolIds", [])
+            all_transfer_ids = [t["id"] for t in existing_transfer_tools]
+            existing_tool_ids = [tid for tid in existing_tool_ids if tid not in all_transfer_ids]
+            
+            # Add our single desired tool_id
+            existing_tool_ids.append(tool_id)
+            model_data["toolIds"] = existing_tool_ids
+            
+            patch_payload = {"model": model_data}
+            patch_res = requests.patch(patch_assistant_url, headers=HEADERS, json=patch_payload)
+            if patch_res.status_code >= 400:
+                raise Exception(f"Vapi Patch Error {patch_res.status_code}: {patch_res.text}")
+            
+    return response.json()
+
+def unlink_telephony(phone_number_id: str) -> dict:
+    """
+    Unlinks and deletes a Twilio phone number from the Vapi account.
+    """
+    url = f"{VAPI_BASE_URL}/phone-number/{phone_number_id}"
+    response = requests.delete(url, headers=HEADERS)
+    response.raise_for_status()
     return response.json()

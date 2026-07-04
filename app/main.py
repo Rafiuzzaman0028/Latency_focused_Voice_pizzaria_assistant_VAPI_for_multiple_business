@@ -13,10 +13,9 @@ load_dotenv()
 EXTERNAL_BACKEND_URL = os.getenv("EXTERNAL_BACKEND_URL", "")
 
 from app.extractor import extract_text, generate_uk_restaurant_prompt
-from app.vapi_client import create_assistant, link_telephony
+from app.vapi_client import create_assistant, link_telephony, unlink_telephony
 
 from app.business_store import save_business_config, get_business_config
-from app.voice_registry import VOICE_CATALOGUE, is_valid_voice_id, DEFAULT_VOICE_ID
 
 def parse_single_string_item(item_str: str) -> dict:
     import re
@@ -171,22 +170,6 @@ app.add_middleware(
 os.makedirs("uploads", exist_ok=True)
 
 
-@app.get("/api/voices")
-async def list_voices():
-    """Returns available UK voice options for the frontend dropdown."""
-    return {
-        "voices": [
-            {
-                "id": v["id"],
-                "name": v["name"],
-                "gender": v["gender"],
-                "accent": v["accent"],
-                "description": v["description"],
-            }
-            for v in VOICE_CATALOGUE
-        ]
-    }
-
 
 class TelephonyLinkRequest(BaseModel):
     assistant_id: str
@@ -204,8 +187,7 @@ async def create_agent(
     menu_file: UploadFile = File(...),
     special_offers_text: str = Form(""),
     special_offers_file: Optional[UploadFile] = File(None),
-    special_offers_enabled: bool = Form(True),
-    voice_id: str = Form("")
+    special_offers_enabled: bool = Form(True)
 ):
     """
     Creates or updates a Vapi assistant.
@@ -260,12 +242,7 @@ async def create_agent(
             special_offers_text=active_special_offers_text
         )
 
-        # Resolve voice ID — use default if empty or not in catalogue
-        selected_voice_id = voice_id.strip() if voice_id else ""
-        if not selected_voice_id or not is_valid_voice_id(selected_voice_id):
-            selected_voice_id = DEFAULT_VOICE_ID
-
-        vapi_response = create_assistant(business_id, system_prompt, voice_id=selected_voice_id)
+        vapi_response = create_assistant(business_id, system_prompt)
 
         save_business_config(
             business_id,
@@ -275,8 +252,7 @@ async def create_agent(
                 "menu_text": menu_text,
                 "special_offers_enabled": special_offers_enabled,
                 "special_offers_text": saved_special_offers_text,
-                "assistant_id": vapi_response.get("id"),
-                "voice_id": selected_voice_id
+                "assistant_id": vapi_response.get("id")
             }
         )
 
@@ -346,8 +322,7 @@ async def update_special_offers(
 
         # Your create_assistant() already PATCHES the existing Vapi assistant
         # if it finds the same business_id.
-        stored_voice_id = config.get("voice_id", DEFAULT_VOICE_ID)
-        vapi_response = create_assistant(business_id, system_prompt, voice_id=stored_voice_id)
+        vapi_response = create_assistant(business_id, system_prompt)
 
         config["special_offers_enabled"] = request.enabled
         config["special_offers_text"] = saved_special_offers_text
@@ -391,6 +366,21 @@ async def link_phone(request: TelephonyLinkRequest):
         return {
             "status": "success",
             "message": "Telephony linked successfully.",
+            "vapi_response": response
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/telephony/unlink/{phone_number_id}")
+async def unlink_phone(phone_number_id: str):
+    """
+    Unlinks and deletes a Twilio phone number using its Vapi ID.
+    """
+    try:
+        response = unlink_telephony(phone_number_id)
+        return {
+            "status": "success",
+            "message": "Telephony unlinked successfully.",
             "vapi_response": response
         }
     except Exception as e:
