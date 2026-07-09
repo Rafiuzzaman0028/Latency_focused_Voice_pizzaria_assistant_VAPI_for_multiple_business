@@ -15,7 +15,7 @@ EXTERNAL_BACKEND_URL = os.getenv("EXTERNAL_BACKEND_URL", "")
 from app.extractor import extract_text, generate_uk_restaurant_prompt
 from app.vapi_client import create_assistant, link_telephony, unlink_telephony
 
-from app.business_store import save_business_config, get_business_config
+from app.business_store import save_business_config, get_business_config, load_all_business_configs
 
 def parse_single_string_item(item_str: str) -> dict:
     import re
@@ -237,6 +237,7 @@ async def create_agent(
         )
 
         system_prompt = generate_uk_restaurant_prompt(
+            business_id,
             rules_text,
             menu_text,
             special_offers_text=active_special_offers_text
@@ -315,6 +316,7 @@ async def update_special_offers(
         )
 
         system_prompt = generate_uk_restaurant_prompt(
+            business_id,
             config["rules_text"],
             config["menu_text"],
             special_offers_text=active_special_offers_text
@@ -348,8 +350,109 @@ async def update_special_offers(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-    
+
+
+@app.patch("/api/agents/{assistant_id}/menu")
+async def update_menu(
+    assistant_id: str,
+    menu_file: UploadFile = File(...)
+):
+    """
+    Updates the menu for an existing Vapi assistant.
+
+    Accepts a new menu file (.xlsx, .pdf, .docx, .txt, .csv), extracts its text,
+    rebuilds the full system prompt using the stored rules and offers, then
+    PATCHes the live Vapi assistant in-place. The stored business config is also
+    updated with the new menu_text.
+
+    Rules, special offers, and the enabled/disabled offers toggle are all preserved.
+    """
+    try:
+        # --- 1. Load stored config based on assistant_id ---
+        configs = load_all_business_configs()
+        business_id = None
+        config = None
+        for b_id, c in configs.items():
+            if c.get("assistant_id") == assistant_id:
+                business_id = b_id
+                config = c
+                break
+
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Business config not found for assistant_id '{assistant_id}'. Create the agent first using /api/agents/create."
+            )
+            
+        menu_path = f"uploads/{business_id}_menu_{menu_file.filename}"
+
+        # --- 2. Save and extract the new menu file ---
+        with open(menu_path, "wb") as buffer:
+            shutil.copyfileobj(menu_file.file, buffer)
+
+        new_menu_text = extract_text(menu_path)
+
+        if not new_menu_text or not new_menu_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="The uploaded menu file appears to be empty or could not be read."
+            )
+
+        # --- 3. Rebuild the system prompt with NEW menu, EXISTING rules & offers ---
+        rules_text = config.get("rules_text", "")
+        special_offers_enabled = config.get("special_offers_enabled", True)
+        saved_special_offers_text = config.get("special_offers_text", "").strip()
+
+        active_special_offers_text = (
+            saved_special_offers_text
+            if special_offers_enabled and saved_special_offers_text
+            else ""
+        )
+
+        system_prompt = generate_uk_restaurant_prompt(
+            business_id,
+            rules_text,
+            new_menu_text,
+            special_offers_text=active_special_offers_text
+        )
+
+        # --- 4. PATCH the Vapi assistant in-place ---
+        vapi_response = create_assistant(business_id, system_prompt)
+
+        # --- 5. Persist the updated menu_text to the config store ---
+        config["menu_text"] = new_menu_text
+        config["assistant_id"] = vapi_response.get("id")
+        save_business_config(business_id, config)
+
+        # Short preview of the new menu for confirmation
+        menu_preview = new_menu_text.strip()[:300]
+
+        return {
+            "status": "success",
+            "business_id": business_id,
+            "assistant_id": vapi_response.get("id"),
+            "message": "Menu updated successfully. The assistant prompt has been refreshed with the new menu.",
+            "menu_preview": menu_preview + ("..." if len(new_menu_text.strip()) > 300 else "")
+        }
+
+    except HTTPException:
+        raise
+
+    except ValueError as e:
+        # Raised by extract_text() for unsupported file types
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        try:
+            if os.path.exists(menu_path):
+                os.remove(menu_path)
+        except Exception:
+            pass
+
+
 @app.post("/api/telephony/link")
 async def link_phone(request: TelephonyLinkRequest):
     """

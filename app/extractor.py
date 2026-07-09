@@ -77,6 +77,7 @@ def extract_text(file_path: str) -> str:
     raise ValueError("Unsupported file type. Only PDF, DOC, DOCX, TXT, XLSX, CSV are allowed.")
 
 def generate_uk_restaurant_prompt(
+    business_id: str,
     business_rules: str,
     menu_text: str,
     special_offers_text: str = ""
@@ -104,5 +105,7 @@ def generate_uk_restaurant_prompt(
         menu_text=menu_text,
         special_offers_text=cleaned_special_offers
     )
+
+    prompt += f"\n\nCRITICAL INSTRUCTION FOR ENDING THE CALL:\nWhen the order is finalized or the conversation is naturally over, you MUST IMMEDIATELY invoke the endCall tool. Do NOT say goodbye yourself. Do NOT generate any text response. Just trigger the tool directly."
 
     return prompt

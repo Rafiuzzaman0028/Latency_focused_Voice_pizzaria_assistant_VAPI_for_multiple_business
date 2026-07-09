@@ -7,3 +7,5 @@ call_logs/
 uploads/
 reports/
 business_configs.json
+business_configs.json
+data/business_configs

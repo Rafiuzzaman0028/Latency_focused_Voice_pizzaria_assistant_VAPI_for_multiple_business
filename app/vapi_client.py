@@ -1,16 +1,21 @@
 import os
 import requests
 import json
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+# Explicitly find and load the .env file from the root directory
+load_dotenv(find_dotenv(), override=True)
 
 VAPI_API_KEY = os.getenv("VAPI_API_KEY", "your-vapi-api-key")
 VAPI_BASE_URL = "https://api.vapi.ai"
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 VAPI_DEFAULT_TOOL_ID = os.getenv("VAPI_DEFAULT_TOOL_ID", "")
-VAPI_SERVER_URL = os.getenv("VAPI_SERVER_URL", "")
+
+def get_vapi_server_url():
+    url = os.getenv("VAPI_SERVER_URL", "").strip()
+    print(f"DEBUG: Loaded VAPI_SERVER_URL = '{url}'")
+    return url
 
 HEADERS = {
     "Authorization": f"Bearer {VAPI_API_KEY}",
@@ -41,13 +46,11 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
     if VAPI_DEFAULT_TOOL_ID:
         tool_ids.append(VAPI_DEFAULT_TOOL_ID)
 
+    vapi_server_url = get_vapi_server_url()
+
     payload = {
         "name": business_id, # Exactly the name you provide
-        "firstMessage": "Hello! Thanks for calling. How can I help you with your order today?",
-        "server": {
-            "url": VAPI_SERVER_URL, # Auto-links the summary webhook from .env
-            "timeoutSeconds": 20
-        },
+        "firstMessage": f"Hi, you're through to {business_id} and I'm their virtual assistant. Would you like to place an order?",
         "metadata": {
             "business_id": business_id
         },
@@ -67,13 +70,13 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                     "type": "endCall",
                     "messages": [
                         {
-                            "type": "request-complete",
-                            "content": "Goodbye! The call will now end."
+                            "type": "request-start",
+                            "content": f"Thanks for calling {business_id}. Have a great day and enjoy your meal!"
                         }
                     ],
                     "function": {
                         "name": "endCall",
-                        "description": "Ends the phone call. Invoke this tool immediately after thanking the customer and saying goodbye when the order is complete or the conversation naturally ends."
+                        "description": "Ends the phone call. Invoke this tool immediately when the order is complete or the conversation naturally ends. Do NOT say goodbye yourself, just trigger this tool."
                     }
                 }
             ]
@@ -94,7 +97,7 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Provide a concise summary of the call. Include the customer's name, email, their mood, what they ordered, the total price of the order, and if the order was successfully handled."
+                        "content": "Provide a concise summary of the call. Include the customer's name, their mood, what they ordered, the total price of the order, payment method chosen, and if the order was successfully handled."
                     },
                     {
                         "role": "user",
@@ -121,9 +124,9 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                         "total_price": {"type": "number"},
                         "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]},
                         "customer_name": {"type": "string"},
-                        "customer_email": {"type": "string"}
+                        "payment_method": {"type": "string", "enum": ["cash", "card", "unknown"]}
                     },
-                    "required": ["items", "total_price", "order_status", "customer_name", "customer_email"]
+                    "required": ["items", "total_price", "order_status", "customer_name"]
                 },
                 "messages": [
                     {
@@ -143,6 +146,14 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
         }
     }
     
+    if vapi_server_url:
+        payload["server"] = {
+            "url": vapi_server_url,
+            "timeoutSeconds": 20
+        }
+    
+    print(f"DEBUG PAYLOAD TO VAPI: {json.dumps(payload, indent=2)}")
+    
     if existing_id:
         print(f"[SYNC] Assistant '{business_id}' already exists (ID: {existing_id}). Updating in-place...")
         url = f"{VAPI_BASE_URL}/assistant/{existing_id}"
@@ -155,7 +166,8 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
     if response.status_code >= 400:
         # Return the actual error from Vapi so it shows in the browser
         error_msg = response.text
-        raise Exception(f"Vapi Error: {error_msg}")
+        print(f"DEBUG VAPI ERROR: {error_msg}")
+        raise Exception(f"Vapi Error: {error_msg} | Payload sent: {json.dumps(payload)}")
     
     return response.json()
 
@@ -204,12 +216,12 @@ def link_telephony(assistant_id: str, twilio_number: str, manager_number: str) -
                     {
                         "type": "number",
                         "number": manager_number,
-                        "message": "Please hold while I transfer you to the manager."
+                        "message": "Please hold while I transfer you to the restaurant."
                     }
                 ],
                 "function": {
                     "name": "transferToManager",
-                    "description": "Transfers the call to a human manager. Invoke this tool immediately when the user asks to speak to a human or manager."
+                    "description": "Transfers the call to the restaurant immediately. Invoke this tool without asking why when: the customer asks to speak to a human, a person, or a manager; the customer makes a complaint; the customer reports a missing item or requests a refund; the customer is unhappy or frustrated; the customer has chosen card payment and the order has been saved."
                 }
             }
             tool_res = requests.post(tool_url, headers=HEADERS, json=tool_payload)
