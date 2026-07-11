@@ -124,14 +124,16 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                         "total_price": {"type": "number"},
                         "order_status": {"type": "string", "enum": ["completed", "abandoned", "in_progress"]},
                         "customer_name": {"type": "string"},
-                        "payment_method": {"type": "string", "enum": ["cash", "card", "unknown"]}
+                        "payment_method": {"type": "string", "enum": ["cash", "card", "unknown"]},
+                        "delivery_type": {"type": "string", "enum": ["pickup", "delivery"]},
+                        "delivery_address": {"type": "string"}
                     },
-                    "required": ["items", "total_price", "order_status", "customer_name"]
+                    "required": ["items", "total_price", "order_status", "customer_name", "delivery_type", "delivery_address"]
                 },
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Extract the final order details for database logging. Ensure the 'total_price' is calculated correctly from the menu prices.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
+                        "content": "Extract the final order details for database logging. For 'total_price', DO NOT attempt to calculate it yourself. You MUST find the final total price that the assistant stated to the customer in the transcript (which includes items and any delivery charges) and output exactly that number. The delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
                     },
                     {
                         "role": "user",
