@@ -352,7 +352,7 @@ async def update_special_offers(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/api/agents/{assistant_id}/menu")
+@app.patch("/api/agents/menu")
 async def update_menu(
     assistant_id: str,
     menu_file: UploadFile = File(...)
