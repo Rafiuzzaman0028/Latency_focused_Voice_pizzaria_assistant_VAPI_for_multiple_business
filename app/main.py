@@ -12,7 +12,7 @@ load_dotenv()
 
 EXTERNAL_BACKEND_URL = os.getenv("EXTERNAL_BACKEND_URL", "")
 
-from app.extractor import extract_text, generate_uk_restaurant_prompt
+from app.extractor import extract_text, generate_uk_restaurant_prompt, extract_business_name
 from app.vapi_client import create_assistant, link_telephony, unlink_telephony
 
 from app.business_store import save_business_config, get_business_config, load_all_business_configs
@@ -236,19 +236,23 @@ async def create_agent(
             else ""
         )
 
+        business_name = extract_business_name(rules_text, business_id)
+
         system_prompt = generate_uk_restaurant_prompt(
             business_id,
             rules_text,
             menu_text,
-            special_offers_text=active_special_offers_text
+            special_offers_text=active_special_offers_text,
+            business_name=business_name
         )
 
-        vapi_response = create_assistant(business_id, system_prompt)
+        vapi_response = create_assistant(business_id, system_prompt, business_name=business_name)
 
         save_business_config(
             business_id,
             {
                 "business_id": business_id,
+                "business_name": business_name,
                 "rules_text": rules_text,
                 "menu_text": menu_text,
                 "special_offers_enabled": special_offers_enabled,
@@ -315,16 +319,19 @@ async def update_special_offers(
             else ""
         )
 
+        business_name = extract_business_name(config["rules_text"], business_id)
+
         system_prompt = generate_uk_restaurant_prompt(
             business_id,
             config["rules_text"],
             config["menu_text"],
-            special_offers_text=active_special_offers_text
+            special_offers_text=active_special_offers_text,
+            business_name=business_name
         )
 
         # Your create_assistant() already PATCHES the existing Vapi assistant
         # if it finds the same business_id.
-        vapi_response = create_assistant(business_id, system_prompt)
+        vapi_response = create_assistant(business_id, system_prompt, business_name=business_name)
 
         config["special_offers_enabled"] = request.enabled
         config["special_offers_text"] = saved_special_offers_text
@@ -409,15 +416,18 @@ async def update_menu(
             else ""
         )
 
+        business_name = extract_business_name(rules_text, business_id)
+
         system_prompt = generate_uk_restaurant_prompt(
             business_id,
             rules_text,
             new_menu_text,
-            special_offers_text=active_special_offers_text
+            special_offers_text=active_special_offers_text,
+            business_name=business_name
         )
 
         # --- 4. PATCH the Vapi assistant in-place ---
-        vapi_response = create_assistant(business_id, system_prompt)
+        vapi_response = create_assistant(business_id, system_prompt, business_name=business_name)
 
         # --- 5. Persist the updated menu_text to the config store ---
         config["menu_text"] = new_menu_text

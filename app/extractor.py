@@ -76,15 +76,52 @@ def extract_text(file_path: str) -> str:
 
     raise ValueError("Unsupported file type. Only PDF, DOC, DOCX, TXT, XLSX, CSV are allowed.")
 
+def extract_business_name(rules_text: str, fallback_name: str = "") -> str:
+    """
+    Extracts the real business name from the uploaded business rules/scripts text.
+    Looks for 'Business Name: X' first, then greeting patterns, then falls back.
+    """
+    import re
+
+    if not rules_text:
+        return fallback_name
+
+    # Strategy 1: Look for "Business Name: <name>"
+    match = re.search(r'Business Name:\s*(.+)', rules_text, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip().rstrip('.')
+        if name:
+            return name
+
+    # Strategy 2: Look for greeting patterns like "welcome to <name>"
+    match = re.search(r'welcome to\s+(.+?)[\.,!?\n]', rules_text, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip()
+        if name and len(name) < 60:
+            return name
+
+    # Strategy 3: Look for "calling <name>" in greeting scripts
+    match = re.search(r'calling\s+(.+?)[\.,!?\n]', rules_text, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip()
+        if name and len(name) < 60:
+            return name
+
+    # Fallback: use the provided fallback name (usually business_id)
+    return fallback_name
+
+
 def generate_uk_restaurant_prompt(
     business_id: str,
     business_rules: str,
     menu_text: str,
-    special_offers_text: str = ""
+    special_offers_text: str = "",
+    business_name: str = ""
 ) -> str:
     """
     Generates a UK restaurant system prompt.
     If special offers are empty, the assistant is told that no offers are active.
+    Uses business_name (extracted from scripts) for customer-facing references.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     prompt_path = os.path.join(base_dir, "uk_system_prompt.txt")
@@ -100,10 +137,14 @@ def generate_uk_restaurant_prompt(
             "Do not mention, create, suggest, or apply any special offers, discounts, bundles, free drinks, meal deals, or collection discounts."
         )
 
+    # Use business_name if provided, otherwise fall back to business_id
+    resolved_name = business_name if business_name else business_id
+
     prompt = prompt_template.format(
         business_rules=business_rules,
         menu_text=menu_text,
-        special_offers_text=cleaned_special_offers
+        special_offers_text=cleaned_special_offers,
+        business_name=resolved_name
     )
 
     prompt += f"\n\nCRITICAL INSTRUCTION FOR ENDING THE CALL:\nWhen the order is finalized or the conversation is naturally over, you MUST IMMEDIATELY invoke the endCall tool. Do NOT say goodbye yourself. Do NOT generate any text response. Just trigger the tool directly."

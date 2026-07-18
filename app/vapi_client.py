@@ -22,10 +22,11 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-def create_assistant(business_id: str, system_prompt: str) -> dict:
+def create_assistant(business_id: str, system_prompt: str, business_name: str = "") -> dict:
     """
     Creates or updates an assistant on Vapi. If an assistant with the name
     already exists, it updates it in-place using PATCH so changes are published instantly.
+    Uses business_name for customer-facing messages (firstMessage, endCall).
     """
     existing_id = None
     try:
@@ -48,9 +49,12 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
 
     vapi_server_url = get_vapi_server_url()
 
+    # Use business_name for customer-facing messages, fall back to business_id
+    display_name = business_name if business_name else business_id
+
     payload = {
         "name": business_id, # Exactly the name you provide
-        "firstMessage": f"Hi, you're through to {business_id} and I'm their virtual assistant. Would you like to place an order?",
+        "firstMessage": f"Hi, you're through to {display_name} and I'm their virtual assistant. Would you like to place an order?",
         "metadata": {
             "business_id": business_id
         },
@@ -71,7 +75,7 @@ def create_assistant(business_id: str, system_prompt: str) -> dict:
                     "messages": [
                         {
                             "type": "request-start",
-                            "content": f"Thanks for calling {business_id}. Have a great day and enjoy your meal!"
+                            "content": f"Thanks for calling {display_name}. Have a great day and enjoy your meal!"
                         }
                     ],
                     "function": {
