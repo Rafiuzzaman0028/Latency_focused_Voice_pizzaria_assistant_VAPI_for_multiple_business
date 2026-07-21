@@ -137,7 +137,7 @@ def create_assistant(business_id: str, system_prompt: str, business_name: str = 
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Extract the final order details for database logging. For 'total_price', DO NOT attempt to calculate it yourself. You MUST find the final total price that the assistant stated to the customer in the transcript (which includes items and any delivery charges) and output exactly that number. The delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
+                        "content": "Extract the final order details for database logging. For each item in 'items', extract 'product_name', 'quantity' (as a string), and 'unit_prize' (the price of ONE unit as a decimal string, e.g. '22.09', '24.10', '5.83'). Look at the individual item prices spoken or recited in the transcript. Do NOT output 'unknown' or '0.0' for unit_prize. If an item price was spoken in words like 'five pounds and eighty-three pence', output '5.83'. For 'total_price', DO NOT attempt to calculate it yourself; output the final total price stated by the assistant to the customer. The delivery_type MUST be exactly 'pickup' or 'delivery'. If delivery_type is 'delivery', extract the 'delivery_address' from the transcript. If it's 'pickup', set 'delivery_address' to 'N/A' or an empty string.\n\nJson Schema:\n{{schema}}\n\nOnly respond with the JSON."
                     },
                     {
                         "role": "user",

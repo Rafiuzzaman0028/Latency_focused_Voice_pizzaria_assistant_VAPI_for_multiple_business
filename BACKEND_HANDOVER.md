@@ -21,7 +21,17 @@ To build the SaaS Dashboard, you will exclusively use the following endpoints ex
 - **What it does:** The AI automatically extracts the text, generates a highly optimized UK-Restaurant Conversational Prompt, and calls Vapi to provision the agent. It configures the agent to automatically extract the Order Summary at the end of the call.
 - **Returns:** JSON containing the unique `assistant_id`. **Save this `assistant_id` in your primary SaaS database!**
 
-### 2. Linking Telephony: `POST /api/telephony/link`
+### 2. Uploading Special Offers PDF: `POST /api/agents/upload-special-offers`
+- **Purpose:** Upload or update a special offers document (.pdf, .docx, .txt, .xlsx) for an existing Vapi assistant via `multipart/form-data`.
+- **Required Form Fields:**
+  - `assistant_id`: String (The assistant ID or business ID).
+  - `special_offers_file`: UploadFile (The PDF/DOCX/TXT file containing special offers).
+- **Optional Form Fields:**
+  - `special_offers_text`: String (Optional additional text instructions).
+- **What it does:** Extracts text from the special offers document, rebuilds the system prompt, updates the stored business config, and PATCHes the live Vapi assistant instantly.
+- **Returns:** JSON containing status, `assistant_id`, `business_id`, and extracted `special_offers_text`.
+
+### 3. Linking Telephony: `POST /api/telephony/link`
 - **Purpose:** When an admin assigns a Twilio number to a business, call this endpoint to link it.
 - **Required JSON Body:**
   - `assistant_id`: String (The ID returned from Step 1).

@@ -44,9 +44,16 @@ def normalize_list(items) -> list:
             product_name = item.get("product_name") or item.get("name") or item.get("item") or "Unknown Product"
             quantity = item.get("quantity") or item.get("qty") or item.get("count") or "1"
             unit_prize = item.get("unit_prize") or item.get("unit_price") or item.get("price")
-            
-            if unit_prize is not None:
-                unit_prize = str(unit_prize)
+
+#           if unit_prize is not None:
+#                unit_prize = str(unit_prize)
+
+            if unit_prize is not None and str(unit_prize).strip().lower() not in ["", "unknown", "none", "null"]:
+                import re
+                unit_str = str(unit_prize).strip()
+                # Clean currency symbol (e.g. £22.09 -> 22.09)
+                cleaned_price = re.sub(r"[^\d\.]", "", unit_str)
+                unit_prize = cleaned_price if cleaned_price else unit_str
             else:
                 unit_prize = "0.0"
 
@@ -355,8 +362,103 @@ async def update_special_offers(
     except HTTPException:
         raise
 
+
+@app.post("/api/agents/upload-special-offers")
+async def upload_special_offers(
+    assistant_id: str = Form(...),
+    special_offers_file: UploadFile = File(...),
+    special_offers_text: str = Form(""),
+    special_offers_enabled: bool = Form(True)
+):
+    """
+    Uploads a special offers file (.pdf, .docx, .doc, .txt, .xlsx, .csv) for an existing Vapi assistant using assistant_id.
+    Extracts text, updates the stored business config, rebuilds the system prompt, and updates the live Vapi assistant.
+    """
+    saved_paths = []
+    try:
+        # 1. Lookup business config by assistant_id or business_id
+        configs = load_all_business_configs()
+        business_id = None
+        config = None
+        for b_id, c in configs.items():
+            if c.get("assistant_id") == assistant_id or b_id == assistant_id:
+                business_id = b_id
+                config = c
+                break
+
+        if not config:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Business config not found for assistant_id or business_id '{assistant_id}'. Create the agent first using /api/agents/create."
+            )
+
+        offers_parts = []
+        if special_offers_text and special_offers_text.strip():
+            offers_parts.append(special_offers_text.strip())
+
+        if special_offers_file and special_offers_file.filename:
+            offers_path = f"uploads/{business_id}_special_offers_{special_offers_file.filename}"
+            saved_paths.append(offers_path)
+
+            with open(offers_path, "wb") as buffer:
+                shutil.copyfileobj(special_offers_file.file, buffer)
+
+            extracted_offers = extract_text(offers_path).strip()
+            if extracted_offers:
+                offers_parts.append(extracted_offers)
+
+        if not offers_parts:
+            raise HTTPException(
+                status_code=400,
+                detail="The uploaded special offers file appears to be empty or could not be read."
+            )
+
+        saved_special_offers_text = "\n\n".join(offers_parts).strip()
+        active_special_offers_text = (
+            saved_special_offers_text if special_offers_enabled else ""
+        )
+
+        rules_text = config.get("rules_text", "")
+        menu_text = config.get("menu_text", "")
+        business_name = config.get("business_name") or extract_business_name(rules_text, business_id)
+
+        system_prompt = generate_uk_restaurant_prompt(
+            business_id,
+            rules_text,
+            menu_text,
+            special_offers_text=active_special_offers_text,
+            business_name=business_name
+        )
+
+        vapi_response = create_assistant(business_id, system_prompt, business_name=business_name)
+
+        config["special_offers_enabled"] = special_offers_enabled
+        config["special_offers_text"] = saved_special_offers_text
+        config["assistant_id"] = vapi_response.get("id")
+
+        save_business_config(business_id, config)
+
+        return {
+            "status": "success",
+            "business_id": business_id,
+            "assistant_id": vapi_response.get("id"),
+            "special_offers_enabled": special_offers_enabled,
+            "special_offers_text": saved_special_offers_text,
+            "message": "Special offers file uploaded and Vapi assistant updated successfully.",
+            "vapi_response": vapi_response
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        for path in saved_paths:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception:
+                pass
 
 
 @app.patch("/api/agents/menu")
